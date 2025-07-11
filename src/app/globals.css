@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "daisyui";
 
 :root {
   --background: #ffffff;
@@ -9,8 +10,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-bg1: #ebfaf7;
+  --color-bg2: #ccf4fe;
   --color-text1: #637381;
   --color-text2: #1c252e;
+  --color-text3: #078dee;
 }
 
 @media (prefers-color-scheme: dark) {
