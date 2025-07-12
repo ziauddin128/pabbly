@@ -2,28 +2,61 @@
 import Logo from "../../../public/Logo";
 import Link from "next/link";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-import { LuEye, LuEyeClosed } from "react-icons/lu";
+import { LuEye, LuEyeClosed, LuChevronDown, LuSearch } from "react-icons/lu";
 import LeftSlide from "./../_components/LeftSlide";
+import Image from "next/image";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function SignUp() {
-  // Use two separate states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const countryList = [
-    { name: "Belarus", code: "+375", flag: "🇧🇾" },
-    { name: "Belize", code: "+501", flag: "🇧🇿" },
-    { name: "Canada", code: "+1", flag: "🇨🇦" },
-    { name: "Cocos (Keeling) Islands", code: "+61", flag: "🇨🇨" },
-    { name: "Congo, Democratic Republic of the", code: "+243", flag: "🇨🇩" },
-    { name: "Central African Republic", code: "+236", flag: "🇨🇫" },
-    { name: "Congo, Republic of the", code: "+242", flag: "🇨🇬" },
-  ];
+  const [countryList, setCountryList] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [selectedCountry, setSelectedCountry] = useState(countryList[3].code);
-  const [mobile, setMobile] = useState("");
+  const recaptchaRef = useRef(null);
+  const [recaptchaValue, setRecaptchaValue] = useState(null);
+
+  // Country Code Api
+  useEffect(() => {
+    fetch("https://restcountries.com/v3.1/all?fields=name,flags,idd")
+      .then((res) => res.json())
+      .then((data) => {
+        setCountryList(data);
+        // Set default to India
+        const india = data.find((country) => country.name.common === "India");
+        if (india) {
+          setSelectedCountry({
+            code: india.idd.root + india.idd.suffixes[0],
+            flag: india.flags.png,
+          });
+        }
+      });
+  }, []);
+
+  const handleCountrySelect = (country) => {
+    setSelectedCountry({
+      code: country.idd.root + country.idd.suffixes[0],
+      flag: country.flags.png,
+    });
+    setIsDropdownOpen(false);
+    setSearchQuery("");
+  };
+
+  // Filter countries based on search query
+  const filteredCountries = countryList.filter((country) => {
+    const query = searchQuery.toLowerCase();
+    const countryName = country.name.common.toLowerCase();
+    const countryCode = (
+      country.idd.root + (country.idd.suffixes?.[0] || "")
+    ).toLowerCase();
+
+    return countryName.includes(query) || countryCode.includes(query);
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen w-full">
@@ -127,24 +160,91 @@ export default function SignUp() {
                 <label className="block mb-1 font-medium text-sm text-text2">
                   Mobile Number
                 </label>
-                <div className="flex gap-2">
-                  <select
-                    className="select select-bordered w-[80px]"
-                    value={selectedCountry}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
-                  >
-                    {countryList.map((country) => (
-                      <option key={country.code} value={country.code}>
-                        {country.flag} {country.code}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-0 border border-gray-300 hover:border-text2 rounded-md">
+                  <details className="dropdown" open={isDropdownOpen}>
+                    <summary
+                      className="btn m-1 w-[80px] px-2 py-2 bg-white text-sm text-text2 border-0 rounded-md flex items-center gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsDropdownOpen(!isDropdownOpen);
+                      }}
+                    >
+                      {selectedCountry ? (
+                        <>
+                          <img
+                            src={selectedCountry.flag}
+                            alt="Country"
+                            width={20}
+                            height={15}
+                            style={{ display: "inline" }}
+                          />
+                          {selectedCountry.code}
+                        </>
+                      ) : (
+                        "+Code"
+                      )}
+                      <LuChevronDown className="text-xs" />
+                    </summary>
+                    <ul
+                      className="menu dropdown-content bg-white shadow-md rounded-box z-1  p-2 border border-gray-300 max-h-[200px] w-[200px] sm:w-[300px] overflow-y-auto "
+                      style={{
+                        flexFlow: "initial",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {/* Search Input */}
+                      <div className="sticky top-0 bg-white pb-2 mb-2 border-b border-gray-200">
+                        <div className="relative">
+                          <LuSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
+                          <input
+                            type="text"
+                            placeholder="Search countries..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-text2"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Country List */}
+                      {filteredCountries.length > 0 ? (
+                        filteredCountries.map((country, idx) => (
+                          <li key={idx} className="w-full">
+                            <a
+                              onClick={() => handleCountrySelect(country)}
+                              className="flex items-center gap-3 w-full px-2 py-2 hover:bg-gray-100 cursor-pointer"
+                              style={{ backgroundColor: "#f3f4f6" }}
+                            >
+                              <img
+                                src={country.flags.png}
+                                alt="Country"
+                                width={24}
+                                height={16}
+                                className="rounded"
+                              />
+                              <span className="font-medium">
+                                {country.idd.root +
+                                  (country.idd.suffixes?.[0] || "")}
+                              </span>
+                              <span className="text-xs text-text2">
+                                {country.name.common}
+                              </span>
+                            </a>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="px-2 py-2 text-sm text-gray-500 text-center">
+                          No countries found
+                        </li>
+                      )}
+                    </ul>
+                  </details>
                   <input
                     type="tel"
                     placeholder="Enter mobile number"
-                    className="input input-bordered input-lg text-sm text-text2 placeholder:text-text1 w-full"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
+                    className="flex-1 input input-lg px-2 py-2 outline-none bg-white text-sm text-text2 border-0 rounded-md focus:outline-0 focus:shadow-0"
                   />
                 </div>
               </div>
@@ -188,6 +288,15 @@ export default function SignUp() {
                   Use 8 or more characters for password.
                 </p>
               </div>
+
+              {/* Recaptcha */}
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+                onChange={(value) => setRecaptchaValue(value)}
+                className="my-4"
+              />
+
               <button className="btn bg-text3 border-0 text-base font-medium text-white py-6 w-full rounded-md">
                 Login
               </button>
